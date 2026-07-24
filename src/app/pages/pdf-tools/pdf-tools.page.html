@@ -1,13 +1,625 @@
-<ion-header [translucent]="true">
+<ion-header>
   <ion-toolbar>
-    <ion-title>pdf-tools</ion-title>
+    <ion-buttons slot="start">
+      <ion-back-button
+        defaultHref="/home"
+      ></ion-back-button>
+    </ion-buttons>
+
+    <ion-title>
+      Herramientas PDF
+    </ion-title>
   </ion-toolbar>
 </ion-header>
 
-<ion-content [fullscreen]="true">
-  <ion-header collapse="condense">
-    <ion-toolbar>
-      <ion-title size="large">pdf-tools</ion-title>
-    </ion-toolbar>
-  </ion-header>
+<ion-content class="ion-padding">
+  <main class="pdf-container">
+    <input
+      #fileInputPdf
+      type="file"
+      accept=".pdf,application/pdf"
+      multiple
+      hidden
+      (change)="importarArchivosPdf($event)"
+    />
+
+    <section class="pdf-header">
+      <div>
+        <span class="section-label">
+          Documento
+        </span>
+
+        <h1>Crear PDF</h1>
+
+        <p>
+          Importa, edita, organiza y convierte las páginas
+          en un solo archivo PDF.
+        </p>
+      </div>
+
+      <div class="page-counter">
+        <strong>
+          {{ paginas.length }}
+        </strong>
+
+        <span>
+          {{
+            paginas.length === 1
+              ? 'página'
+              : 'páginas'
+          }}
+        </span>
+      </div>
+    </section>
+
+    @if (mensaje) {
+      <p class="status-message">
+        {{ mensaje }}
+      </p>
+    }
+
+    @if (mensajeError) {
+      <p class="error-message">
+        {{ mensajeError }}
+      </p>
+    }
+
+    @if (paginas.length === 0) {
+      <section class="empty-pdf">
+        <ion-icon
+          name="document-outline"
+        ></ion-icon>
+
+        <h2>No hay páginas</h2>
+
+        <p>
+          Selecciona un archivo PDF para importar
+          y editar sus páginas.
+        </p>
+
+        <ion-button
+          expand="block"
+          [disabled]="importando || generando"
+          (click)="fileInputPdf.click()"
+        >
+          @if (importando) {
+            <ion-spinner
+              name="crescent"
+              slot="start"
+            ></ion-spinner>
+
+            Procesando PDF...
+          } @else {
+            <ion-icon
+              name="document-outline"
+              slot="start"
+            ></ion-icon>
+
+            Seleccionar archivo PDF
+          }
+        </ion-button>
+      </section>
+    } @else {
+      <section class="import-more-section">
+        <ion-button
+          expand="block"
+          fill="outline"
+          [disabled]="importando || generando"
+          (click)="fileInputPdf.click()"
+        >
+          @if (importando) {
+            <ion-spinner
+              name="crescent"
+              slot="start"
+            ></ion-spinner>
+
+            Procesando PDF...
+          } @else {
+            <ion-icon
+              name="document-outline"
+              slot="start"
+            ></ion-icon>
+
+            Agregar otro PDF
+          }
+        </ion-button>
+      </section>
+
+      <section class="pages-section">
+        <div class="section-heading">
+          <span class="section-label">
+            Vista previa
+          </span>
+
+          <h2>
+            Páginas del documento
+          </h2>
+        </div>
+
+        <div class="pages-grid">
+          @for (
+            pagina of paginas;
+            track pagina.id;
+            let indice = $index
+          ) {
+            <article
+              class="page-card"
+              [class.selected]="
+                paginaSeleccionadaId === pagina.id
+              "
+              (click)="seleccionarPagina(pagina.id)"
+            >
+              <div class="page-image">
+                <img
+                  [src]="pagina.dataUrl"
+                  [alt]="'Página ' + (indice + 1)"
+                />
+
+                <span class="page-number">
+                  {{ indice + 1 }}
+                </span>
+              </div>
+
+              <div class="page-info">
+                <span>
+                  {{ pagina.nombre }}
+                </span>
+              </div>
+
+              <div class="page-actions">
+                <button
+                  type="button"
+                  [disabled]="indice === 0"
+                  (click)="
+                    $event.stopPropagation();
+                    subirPagina(indice)
+                  "
+                  aria-label="Mover página arriba"
+                >
+                  <ion-icon
+                    name="arrow-up-outline"
+                  ></ion-icon>
+                </button>
+
+                <button
+                  type="button"
+                  [disabled]="
+                    indice === paginas.length - 1
+                  "
+                  (click)="
+                    $event.stopPropagation();
+                    bajarPagina(indice)
+                  "
+                  aria-label="Mover página abajo"
+                >
+                  <ion-icon
+                    name="arrow-down-outline"
+                  ></ion-icon>
+                </button>
+
+                <button
+                  type="button"
+                  class="delete-button"
+                  (click)="
+                    $event.stopPropagation();
+                    eliminarPagina(pagina.id)
+                  "
+                  aria-label="Eliminar página"
+                >
+                  <ion-icon
+                    name="trash-outline"
+                  ></ion-icon>
+                </button>
+              </div>
+            </article>
+          }
+        </div>
+      </section>
+
+      @if (
+        obtenerPaginaSeleccionada();
+        as paginaSeleccionada
+      ) {
+        <section class="page-editor">
+          <div class="editor-header">
+            <div>
+              <span class="section-label">
+                Editor
+              </span>
+
+              <h2>Editar página</h2>
+            </div>
+
+            <button
+              type="button"
+              class="close-editor"
+              (click)="cerrarEditor()"
+              aria-label="Cerrar editor"
+            >
+              <ion-icon
+                name="close-outline"
+              ></ion-icon>
+            </button>
+          </div>
+
+          <div class="editor-preview">
+            @if (modoRecorte) {
+              <img
+                #imagenEditorPdf
+                class="cropper-image"
+                [src]="paginaSeleccionada.dataUrl"
+                alt="Página para recortar"
+              />
+            } @else {
+              <img
+                class="normal-editor-image"
+                [src]="paginaSeleccionada.dataUrl"
+                alt="Página seleccionada"
+                [style.filter]="obtenerFiltroVistaPrevia()"
+              />
+            }
+          </div>
+
+          @if (modoRecorte) {
+            <div class="crop-actions">
+              <ion-button
+                expand="block"
+                fill="outline"
+                [disabled]="procesandoEdicion"
+                (click)="girarDentroDelRecorte()"
+              >
+                <ion-icon
+                  name="return-up-forward-outline"
+                  slot="start"
+                ></ion-icon>
+
+                Girar
+              </ion-button>
+
+              <ion-button
+                expand="block"
+                [disabled]="procesandoEdicion"
+                (click)="aplicarRecorte()"
+              >
+                Aplicar recorte
+              </ion-button>
+
+              <ion-button
+                expand="block"
+                fill="outline"
+                color="medium"
+                [disabled]="procesandoEdicion"
+                (click)="cancelarRecorte()"
+              >
+                Cancelar
+              </ion-button>
+            </div>
+          } @else {
+            <ion-button
+              expand="block"
+              fill="outline"
+              [disabled]="procesandoEdicion"
+              (click)="activarRecorte()"
+            >
+              <ion-icon
+                name="crop-outline"
+                slot="start"
+              ></ion-icon>
+
+              Recortar página
+            </ion-button>
+
+            <div class="editor-actions">
+              <ion-button
+                fill="outline"
+                [disabled]="procesandoEdicion"
+                (click)="girarPaginaSeleccionada()"
+              >
+                <ion-icon
+                  name="return-up-forward-outline"
+                  slot="start"
+                ></ion-icon>
+
+                Girar
+              </ion-button>
+
+              <ion-button
+                fill="outline"
+                [disabled]="procesandoEdicion"
+                (click)="seleccionarFiltro('documento')"
+              >
+                Documento
+              </ion-button>
+
+              <ion-button
+                fill="outline"
+                [disabled]="procesandoEdicion"
+                (click)="seleccionarFiltro('grises')"
+              >
+                Grises
+              </ion-button>
+
+              <ion-button
+                fill="outline"
+                [disabled]="procesandoEdicion"
+                (click)="seleccionarFiltro('blanco-negro')"
+              >
+                B/N
+              </ion-button>
+
+              <ion-button
+                fill="outline"
+                [disabled]="procesandoEdicion"
+                (click)="seleccionarFiltro('claro')"
+              >
+                Claro
+              </ion-button>
+
+              <ion-button
+                fill="outline"
+                [disabled]="procesandoEdicion"
+                (click)="seleccionarFiltro('oscuro')"
+              >
+                Oscuro
+              </ion-button>
+
+              <ion-button
+                fill="clear"
+                [disabled]="procesandoEdicion"
+                (click)="restaurarPagina()"
+              >
+                <ion-icon
+                  name="refresh-outline"
+                  slot="start"
+                ></ion-icon>
+
+                Restaurar
+              </ion-button>
+            </div>
+
+            <div class="adjustments">
+              <label>
+                <span>
+                  Brillo: {{ brillo }}%
+                </span>
+
+                <ion-range
+                  min="50"
+                  max="160"
+                  step="1"
+                  [(ngModel)]="brillo"
+                ></ion-range>
+              </label>
+
+              <label>
+                <span>
+                  Contraste: {{ contraste }}%
+                </span>
+
+                <ion-range
+                  min="50"
+                  max="200"
+                  step="1"
+                  [(ngModel)]="contraste"
+                ></ion-range>
+              </label>
+
+              <label>
+                <span>
+                  Escala de grises:
+                  {{ escalaGrises }}%
+                </span>
+
+                <ion-range
+                  min="0"
+                  max="100"
+                  step="1"
+                  [(ngModel)]="escalaGrises"
+                ></ion-range>
+              </label>
+
+              <ion-button
+                expand="block"
+                [disabled]="procesandoEdicion"
+                (click)="guardarAjustesPagina()"
+              >
+                Guardar ajustes
+              </ion-button>
+            </div>
+          }
+        </section>
+      }
+
+      <section class="settings-section">
+        <div class="section-heading">
+          <span class="section-label">
+            Configuración
+          </span>
+
+          <h2>Opciones del PDF</h2>
+        </div>
+
+        <div class="settings-grid">
+          <ion-item>
+            <ion-label position="stacked">
+              Nombre del documento
+            </ion-label>
+
+            <ion-input
+              [(ngModel)]="nombreDocumento"
+              placeholder="Documento escaneado"
+              maxlength="80"
+            ></ion-input>
+          </ion-item>
+
+          <ion-item>
+            <ion-label position="stacked">
+              Tamaño de hoja
+            </ion-label>
+
+            <ion-select
+              [(ngModel)]="tamanoHoja"
+              interface="popover"
+            >
+              <ion-select-option value="automatico">
+                Automático
+              </ion-select-option>
+
+              <ion-select-option value="a4">
+                A4
+              </ion-select-option>
+
+              <ion-select-option value="carta">
+                Carta
+              </ion-select-option>
+            </ion-select>
+          </ion-item>
+
+          <ion-item>
+            <ion-label position="stacked">
+              Orientación
+            </ion-label>
+
+            <ion-select
+              [(ngModel)]="orientacion"
+              interface="popover"
+            >
+              <ion-select-option value="automatica">
+                Automática
+              </ion-select-option>
+
+              <ion-select-option value="vertical">
+                Vertical
+              </ion-select-option>
+
+              <ion-select-option value="horizontal">
+                Horizontal
+              </ion-select-option>
+            </ion-select>
+          </ion-item>
+        </div>
+
+        <div class="range-control">
+          <div class="range-header">
+            <div>
+              <span>Calidad</span>
+
+              <ion-note>
+                Una calidad menor reduce el peso.
+              </ion-note>
+            </div>
+
+            <strong>
+              {{ calidad }}%
+            </strong>
+          </div>
+
+          <ion-range
+            min="40"
+            max="100"
+            step="5"
+            [(ngModel)]="calidad"
+          ></ion-range>
+        </div>
+
+        <div class="range-control">
+          <div class="range-header">
+            <div>
+              <span>Margen</span>
+
+              <ion-note>
+                Espacio alrededor de cada página.
+              </ion-note>
+            </div>
+
+            <strong>
+              {{ margen }} pt
+            </strong>
+          </div>
+
+          <ion-range
+            min="0"
+            max="60"
+            step="5"
+            [(ngModel)]="margen"
+          ></ion-range>
+        </div>
+      </section>
+
+      <section class="export-section">
+        <div class="section-heading">
+          <span class="section-label">
+            Exportar
+          </span>
+
+          <h2>Crear documento</h2>
+        </div>
+
+        <div class="export-actions">
+          <ion-button
+            expand="block"
+            size="large"
+            [disabled]="
+              generando ||
+              importando ||
+              modoRecorte
+            "
+            (click)="crearPdf()"
+          >
+            @if (generando) {
+              <ion-spinner
+                name="crescent"
+                slot="start"
+              ></ion-spinner>
+            } @else {
+              <ion-icon
+                name="download-outline"
+                slot="start"
+              ></ion-icon>
+            }
+
+            Crear PDF
+          </ion-button>
+
+          <ion-button
+            expand="block"
+            size="large"
+            fill="outline"
+            [disabled]="
+              generando ||
+              importando ||
+              modoRecorte
+            "
+            (click)="compartirPdf()"
+          >
+            <ion-icon
+              name="share-outline"
+              slot="start"
+            ></ion-icon>
+
+            Compartir
+          </ion-button>
+        </div>
+
+        <ion-button
+          expand="block"
+          fill="clear"
+          color="danger"
+          [disabled]="
+            generando ||
+            importando ||
+            modoRecorte
+          "
+          (click)="eliminarTodas()"
+        >
+          <ion-icon
+            name="trash-outline"
+            slot="start"
+          ></ion-icon>
+
+          Eliminar todas las páginas
+        </ion-button>
+      </section>
+    }
+  </main>
 </ion-content>

@@ -10,8 +10,15 @@
 
 <ion-content class="ion-padding">
   <section class="scanner-actions">
-    <ion-button expand="block" (click)="tomarFoto()">
-      <ion-icon name="camera-outline" slot="start"></ion-icon>
+    <ion-button
+      expand="block"
+      (click)="tomarFoto()"
+    >
+      <ion-icon
+        name="camera-outline"
+        slot="start"
+      ></ion-icon>
+
       Tomar fotografía
     </ion-button>
 
@@ -21,7 +28,11 @@
         fill="outline"
         (click)="tomarFoto()"
       >
-        <ion-icon name="add-outline" slot="start"></ion-icon>
+        <ion-icon
+          name="add-outline"
+          slot="start"
+        ></ion-icon>
+
         Agregar otra página
       </ion-button>
     }
@@ -35,26 +46,362 @@
     </div>
   }
 
-  <section class="pages-grid">
-    @for (pagina of paginas; track pagina.id; let indice = $index) {
-      <article class="page-card">
-        <img
-          [src]="pagina.dataUrl"
-          [alt]="'Página ' + (indice + 1)"
-        />
+  @if (paginas.length > 0) {
+    <section class="pages-grid">
+      @for (
+        pagina of paginas;
+        track pagina.id;
+        let indice = $index
+      ) {
+        <article
+          class="page-card"
+          [class.selected]="
+            paginaSeleccionadaId === pagina.id
+          "
+          (click)="seleccionarPagina(pagina.id)"
+        >
+          <img
+            [src]="pagina.dataUrl"
+            [alt]="'Página ' + (indice + 1)"
+          />
 
-        <div class="page-footer">
-          <span>Página {{ indice + 1 }}</span>
+          <div class="page-footer">
+            <span>Página {{ indice + 1 }}</span>
+
+            <div class="page-actions">
+              <button
+                type="button"
+                [disabled]="indice === 0"
+                (click)="
+                  $event.stopPropagation();
+                  subirPagina(indice)
+                "
+                aria-label="Subir página"
+              >
+                <ion-icon
+                  name="chevron-up-outline"
+                ></ion-icon>
+              </button>
+
+              <button
+                type="button"
+                [disabled]="
+                  indice === paginas.length - 1
+                "
+                (click)="
+                  $event.stopPropagation();
+                  bajarPagina(indice)
+                "
+                aria-label="Bajar página"
+              >
+                <ion-icon
+                  name="chevron-down-outline"
+                ></ion-icon>
+              </button>
+
+              <button
+                type="button"
+                (click)="
+                  $event.stopPropagation();
+                  duplicarPagina(pagina.id)
+                "
+                aria-label="Duplicar página"
+              >
+                <ion-icon
+                  name="copy-outline"
+                ></ion-icon>
+              </button>
+
+              <button
+                type="button"
+                class="delete-button"
+                (click)="
+                  $event.stopPropagation();
+                  eliminarFoto(pagina.id)
+                "
+                aria-label="Eliminar página"
+              >
+                <ion-icon
+                  name="trash-outline"
+                ></ion-icon>
+              </button>
+            </div>
+          </div>
+        </article>
+      }
+    </section>
+
+    @if (
+      obtenerPaginaSeleccionada();
+      as paginaSeleccionada
+    ) {
+      <section class="editor-section">
+        <div class="editor-header">
+          <div>
+            <span>Editor</span>
+            <h2>Editar página</h2>
+          </div>
 
           <button
             type="button"
-            (click)="eliminarFoto(pagina.id)"
-            aria-label="Eliminar página"
+            class="close-editor"
+            (click)="cerrarEditor()"
+            aria-label="Cerrar editor"
           >
-            <ion-icon name="close-outline"></ion-icon>
+            <ion-icon
+              name="close-outline"
+            ></ion-icon>
           </button>
         </div>
-      </article>
+
+        <div class="editor-preview">
+          @if (modoRecorte) {
+            <img
+              #imagenEditor
+              class="cropper-image"
+              [src]="paginaSeleccionada.dataUrl"
+              alt="Página para recortar"
+            />
+          } @else {
+            <img
+              class="normal-editor-image"
+              [src]="paginaSeleccionada.dataUrl"
+              alt="Página seleccionada"
+              [style.filter]="
+                'brightness(' + brillo + '%)' +
+                ' contrast(' + contraste + '%)' +
+                ' grayscale(' + escalaGrises + '%)'
+              "
+            />
+          }
+        </div>
+
+        @if (modoRecorte) {
+          <div class="crop-actions">
+            <ion-button
+              expand="block"
+              fill="outline"
+              (click)="girarRecorte()"
+            >
+              <ion-icon
+                name="return-up-forward-outline"
+                slot="start"
+              ></ion-icon>
+
+              Girar
+            </ion-button>
+
+            <ion-button
+              expand="block"
+              [disabled]="procesandoEdicion"
+              (click)="aplicarRecorteInteractivo()"
+            >
+              Aplicar recorte
+            </ion-button>
+
+            <ion-button
+              expand="block"
+              fill="outline"
+              color="medium"
+              (click)="cancelarRecorte()"
+            >
+              Cancelar
+            </ion-button>
+          </div>
+        } @else {
+          <ion-button
+            expand="block"
+            fill="outline"
+            [disabled]="procesandoEdicion"
+            (click)="activarRecorte()"
+          >
+            <ion-icon
+              name="crop-outline"
+              slot="start"
+            ></ion-icon>
+
+            Recortar
+          </ion-button>
+
+          <div class="quick-actions">
+            <ion-button
+              fill="outline"
+              [disabled]="procesandoEdicion"
+              (click)="girarPagina()"
+            >
+              <ion-icon
+                name="return-up-forward-outline"
+                slot="start"
+              ></ion-icon>
+
+              Girar
+            </ion-button>
+
+            <ion-button
+              fill="outline"
+              [disabled]="procesandoEdicion"
+              (click)="aplicarFiltro('documento')"
+            >
+              Documento
+            </ion-button>
+
+            <ion-button
+              fill="outline"
+              [disabled]="procesandoEdicion"
+              (click)="aplicarFiltro('grises')"
+            >
+              Grises
+            </ion-button>
+
+            <ion-button
+              fill="outline"
+              [disabled]="procesandoEdicion"
+              (click)="
+                aplicarFiltro('blanco-negro')
+              "
+            >
+              B/N
+            </ion-button>
+
+            <ion-button
+              fill="outline"
+              [disabled]="procesandoEdicion"
+              (click)="aplicarFiltro('claro')"
+            >
+              Claro
+            </ion-button>
+
+            <ion-button
+              fill="outline"
+              [disabled]="procesandoEdicion"
+              (click)="aplicarFiltro('oscuro')"
+            >
+              Oscuro
+            </ion-button>
+
+            <ion-button
+              fill="clear"
+              [disabled]="procesandoEdicion"
+              (click)="restaurarPagina()"
+            >
+              <ion-icon
+                name="refresh-outline"
+                slot="start"
+              ></ion-icon>
+
+              Restaurar
+            </ion-button>
+          </div>
+
+          <div class="editor-panel">
+            <h3>Ajustes</h3>
+
+            <label>
+              <span>
+                Brillo: {{ brillo }}%
+              </span>
+
+              <ion-range
+                min="50"
+                max="160"
+                step="1"
+                [(ngModel)]="brillo"
+              ></ion-range>
+            </label>
+
+            <label>
+              <span>
+                Contraste: {{ contraste }}%
+              </span>
+
+              <ion-range
+                min="50"
+                max="200"
+                step="1"
+                [(ngModel)]="contraste"
+              ></ion-range>
+            </label>
+
+            <label>
+              <span>
+                Escala de grises:
+                {{ escalaGrises }}%
+              </span>
+
+              <ion-range
+                min="0"
+                max="100"
+                step="1"
+                [(ngModel)]="escalaGrises"
+              ></ion-range>
+            </label>
+
+            <ion-button
+              expand="block"
+              [disabled]="procesandoEdicion"
+              (click)="guardarAjustes()"
+            >
+              Guardar ajustes
+            </ion-button>
+          </div>
+        }
+      </section>
     }
-  </section>
+
+   <section class="export-section">
+  <h2>Exportar escaneo</h2>
+
+  <ion-item>
+    <ion-label position="stacked">
+      Formato
+    </ion-label>
+
+    <ion-select
+      [(ngModel)]="formatoExportacion"
+      interface="popover"
+    >
+      <ion-select-option value="pdf">
+        PDF
+      </ion-select-option>
+
+      <ion-select-option value="jpg">
+        JPG
+      </ion-select-option>
+
+      <ion-select-option value="png">
+        PNG
+      </ion-select-option>
+    </ion-select>
+  </ion-item>
+
+  <div class="export-actions">
+    <ion-button
+      expand="block"
+      [disabled]="paginas.length === 0 || exportando"
+      (click)="descargarEscaneo()"
+    >
+      <ion-icon
+        name="download-outline"
+        slot="start"
+      ></ion-icon>
+
+      Descargar
+    </ion-button>
+
+    <ion-button
+      expand="block"
+      fill="outline"
+      [disabled]="paginas.length === 0 || exportando"
+      (click)="compartirEscaneo()"
+    >
+      <ion-icon
+        name="share-outline"
+        slot="start"
+      ></ion-icon>
+
+      Compartir
+    </ion-button>
+  </div>
+</section>
+  }
 </ion-content>
