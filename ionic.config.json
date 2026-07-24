@@ -1,0 +1,7 @@
+{
+  "name": "ScanDocsSF-Mobile",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular-standalone"
+}
