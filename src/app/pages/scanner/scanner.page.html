@@ -1,0 +1,60 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/home"></ion-back-button>
+    </ion-buttons>
+
+    <ion-title>Escanear</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <section class="scanner-actions">
+    <ion-button expand="block" (click)="tomarFoto()">
+      <ion-icon name="camera-outline" slot="start"></ion-icon>
+      Tomar fotografía
+    </ion-button>
+
+    @if (paginas.length > 0) {
+      <ion-button
+        expand="block"
+        fill="outline"
+        (click)="tomarFoto()"
+      >
+        <ion-icon name="add-outline" slot="start"></ion-icon>
+        Agregar otra página
+      </ion-button>
+    }
+  </section>
+
+  @if (paginas.length === 0) {
+    <div class="empty-state">
+      <ion-icon name="camera-outline"></ion-icon>
+      <h2>No hay páginas</h2>
+      <p>Toma una fotografía para comenzar.</p>
+    </div>
+  }
+
+  <section class="pages-grid">
+    @for (pagina of paginas; track pagina.id; let indice = $index) {
+      <article class="page-card">
+        <img
+          [src]="pagina.dataUrl"
+          [alt]="'Página ' + (indice + 1)"
+        />
+
+        <div class="page-footer">
+          <span>Página {{ indice + 1 }}</span>
+
+          <button
+            type="button"
+            (click)="eliminarFoto(pagina.id)"
+            aria-label="Eliminar página"
+          >
+            <ion-icon name="close-outline"></ion-icon>
+          </button>
+        </div>
+      </article>
+    }
+  </section>
+</ion-content>

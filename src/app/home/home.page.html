@@ -1,20 +1,40 @@
-<ion-header [translucent]="true">
-  <ion-toolbar>
-    <ion-title>
-      Blank
-    </ion-title>
-  </ion-toolbar>
-</ion-header>
-
 <ion-content [fullscreen]="true">
-  <ion-header collapse="condense">
-    <ion-toolbar>
-      <ion-title size="large">Blank</ion-title>
-    </ion-toolbar>
-  </ion-header>
+  <main class="home-container">
+    <header class="app-header">
+      <h1>ScanDocSF</h1>
+      <p>Escanea, convierte y comparte tus documentos</p>
+    </header>
 
-  <div id="container">
-    <strong>Ready to create an app?</strong>
-    <p>Start with Ionic <a target="_blank" rel="noopener noreferrer" href="https://ionicframework.com/docs/components">UI Components</a></p>
-  </div>
+    <ion-searchbar
+      placeholder='Buscar, por ejemplo: "Credencial"'
+      [(ngModel)]="busqueda"
+      (ionInput)="filtrarHerramientas()"
+      show-clear-button="focus"
+    ></ion-searchbar>
+
+    <section class="tools-grid">
+      @for (herramienta of herramientasFiltradas; track herramienta.ruta) {
+        <button
+          class="tool-card"
+          type="button"
+          (click)="abrirHerramienta(herramienta.ruta)"
+        >
+          <ion-icon [name]="herramienta.icono"></ion-icon>
+          <span>{{ herramienta.nombre }}</span>
+        </button>
+      }
+    </section>
+
+    <section class="recent-section">
+      <div class="section-header">
+        <h2>Documentos recientes</h2>
+        <button type="button">Ver todos</button>
+      </div>
+
+      <div class="empty-state">
+        <ion-icon name="document-text-outline"></ion-icon>
+        <p>Aquí aparecerán los documentos guardados.</p>
+      </div>
+    </section>
+  </main>
 </ion-content>
