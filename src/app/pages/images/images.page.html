@@ -1,13 +1,560 @@
-<ion-header [translucent]="true">
+<ion-header>
   <ion-toolbar>
-    <ion-title>images</ion-title>
+    <ion-buttons slot="start">
+      <ion-back-button
+        defaultHref="/home"
+      ></ion-back-button>
+    </ion-buttons>
+
+    <ion-title>
+      Imágenes
+    </ion-title>
   </ion-toolbar>
 </ion-header>
 
-<ion-content [fullscreen]="true">
-  <ion-header collapse="condense">
-    <ion-toolbar>
-      <ion-title size="large">images</ion-title>
-    </ion-toolbar>
-  </ion-header>
+<ion-content class="ion-padding">
+  <main class="images-container">
+    <input
+      #fileInput
+      type="file"
+      accept="image/*"
+      multiple
+      hidden
+      (change)="importarImagenes($event)"
+    />
+
+    <section class="images-header">
+      <div>
+        <span class="section-label">
+          Editor
+        </span>
+
+        <h1>Editar imágenes</h1>
+
+        <p>
+          Importa, recorta, gira, mejora y exporta
+          tus imágenes.
+        </p>
+      </div>
+
+      <div class="image-counter">
+        <strong>
+          {{ imagenes.length }}
+        </strong>
+
+        <span>
+          {{
+            imagenes.length === 1
+              ? 'imagen'
+              : 'imágenes'
+          }}
+        </span>
+      </div>
+    </section>
+
+    @if (mensaje) {
+      <p class="status-message">
+        {{ mensaje }}
+      </p>
+    }
+
+    @if (mensajeError) {
+      <p class="error-message">
+        {{ mensajeError }}
+      </p>
+    }
+
+    @if (imagenes.length === 0) {
+      <section class="empty-images">
+        <ion-icon
+          name="images-outline"
+        ></ion-icon>
+
+        <h2>No hay imágenes</h2>
+
+        <p>
+          Selecciona una o varias imágenes para
+          comenzar a editarlas.
+        </p>
+
+        <ion-button
+          expand="block"
+          [disabled]="importando"
+          (click)="fileInput.click()"
+        >
+          @if (importando) {
+            <ion-spinner
+              name="crescent"
+              slot="start"
+            ></ion-spinner>
+
+            Importando...
+          } @else {
+            <ion-icon
+              name="images-outline"
+              slot="start"
+            ></ion-icon>
+
+            Seleccionar imágenes
+          }
+        </ion-button>
+      </section>
+    } @else {
+      <section class="import-section">
+        <ion-button
+          expand="block"
+          fill="outline"
+          [disabled]="
+            importando ||
+            exportando ||
+            procesandoEdicion
+          "
+          (click)="fileInput.click()"
+        >
+          <ion-icon
+            name="add-outline"
+            slot="start"
+          ></ion-icon>
+
+          Agregar imágenes
+        </ion-button>
+      </section>
+
+      <section class="images-section">
+        <div class="section-heading">
+          <span class="section-label">
+            Biblioteca
+          </span>
+
+          <h2>Imágenes importadas</h2>
+        </div>
+
+        <div class="images-grid">
+          @for (
+            imagen of imagenes;
+            track imagen.id;
+            let indice = $index
+          ) {
+            <article
+              class="image-card"
+              [class.selected]="
+                imagenSeleccionadaId === imagen.id
+              "
+              (click)="seleccionarImagen(imagen.id)"
+            >
+              <div class="image-preview">
+                <img
+                  [src]="imagen.dataUrl"
+                  [alt]="imagen.nombre"
+                />
+
+                <span class="image-number">
+                  {{ indice + 1 }}
+                </span>
+              </div>
+
+              <div class="image-name">
+                {{ imagen.nombre }}
+              </div>
+
+              <div class="image-actions">
+                <button
+                  type="button"
+                  [disabled]="indice === 0"
+                  (click)="
+                    $event.stopPropagation();
+                    subirImagen(indice)
+                  "
+                  aria-label="Subir imagen"
+                >
+                  <ion-icon
+                    name="arrow-up-outline"
+                  ></ion-icon>
+                </button>
+
+                <button
+                  type="button"
+                  [disabled]="
+                    indice === imagenes.length - 1
+                  "
+                  (click)="
+                    $event.stopPropagation();
+                    bajarImagen(indice)
+                  "
+                  aria-label="Bajar imagen"
+                >
+                  <ion-icon
+                    name="arrow-down-outline"
+                  ></ion-icon>
+                </button>
+
+                <button
+                  type="button"
+                  (click)="
+                    $event.stopPropagation();
+                    duplicarImagen(imagen.id)
+                  "
+                  aria-label="Duplicar imagen"
+                >
+                  <ion-icon
+                    name="copy-outline"
+                  ></ion-icon>
+                </button>
+
+                <button
+                  type="button"
+                  class="delete-button"
+                  (click)="
+                    $event.stopPropagation();
+                    eliminarImagen(imagen.id)
+                  "
+                  aria-label="Eliminar imagen"
+                >
+                  <ion-icon
+                    name="trash-outline"
+                  ></ion-icon>
+                </button>
+              </div>
+            </article>
+          }
+        </div>
+      </section>
+
+      @if (
+        obtenerImagenSeleccionada();
+        as imagenSeleccionada
+      ) {
+        <section class="image-editor">
+          <div class="editor-header">
+            <div>
+              <span class="section-label">
+                Editor
+              </span>
+
+              <h2>Editar imagen</h2>
+            </div>
+
+            <button
+              type="button"
+              class="close-editor"
+              (click)="cerrarEditor()"
+              aria-label="Cerrar editor"
+            >
+              <ion-icon
+                name="close-outline"
+              ></ion-icon>
+            </button>
+          </div>
+
+          <div class="editor-preview">
+            @if (modoRecorte) {
+              <img
+                #imagenEditor
+                class="cropper-image"
+                [src]="imagenSeleccionada.dataUrl"
+                alt="Imagen para recortar"
+              />
+            } @else {
+              <img
+                class="normal-editor-image"
+                [src]="imagenSeleccionada.dataUrl"
+                alt="Imagen seleccionada"
+                [style.filter]="
+                  obtenerFiltroVistaPrevia()
+                "
+              />
+            }
+          </div>
+
+          @if (modoRecorte) {
+            <div class="crop-actions">
+              <ion-button
+                expand="block"
+                fill="outline"
+                [disabled]="procesandoEdicion"
+                (click)="girarRecorte()"
+              >
+                <ion-icon
+                  name="return-up-forward-outline"
+                  slot="start"
+                ></ion-icon>
+
+                Girar
+              </ion-button>
+
+              <ion-button
+                expand="block"
+                [disabled]="procesandoEdicion"
+                (click)="aplicarRecorte()"
+              >
+                Aplicar recorte
+              </ion-button>
+
+              <ion-button
+                expand="block"
+                fill="outline"
+                color="medium"
+                [disabled]="procesandoEdicion"
+                (click)="cancelarRecorte()"
+              >
+                Cancelar
+              </ion-button>
+            </div>
+          } @else {
+            <ion-button
+              expand="block"
+              fill="outline"
+              [disabled]="procesandoEdicion"
+              (click)="activarRecorte()"
+            >
+              <ion-icon
+                name="crop-outline"
+                slot="start"
+              ></ion-icon>
+
+              Recortar
+            </ion-button>
+
+            <div class="editor-actions">
+              <ion-button
+                fill="outline"
+                [disabled]="procesandoEdicion"
+                (click)="girarImagen()"
+              >
+                <ion-icon
+                  name="return-up-forward-outline"
+                  slot="start"
+                ></ion-icon>
+
+                Girar
+              </ion-button>
+
+              <ion-button
+                fill="outline"
+                (click)="seleccionarFiltro('documento')"
+              >
+                Documento
+              </ion-button>
+
+              <ion-button
+                fill="outline"
+                (click)="seleccionarFiltro('grises')"
+              >
+                Grises
+              </ion-button>
+
+              <ion-button
+                fill="outline"
+                (click)="
+                  seleccionarFiltro('blanco-negro')
+                "
+              >
+                B/N
+              </ion-button>
+
+              <ion-button
+                fill="outline"
+                (click)="seleccionarFiltro('claro')"
+              >
+                Claro
+              </ion-button>
+
+              <ion-button
+                fill="outline"
+                (click)="seleccionarFiltro('oscuro')"
+              >
+                Oscuro
+              </ion-button>
+
+              <ion-button
+                fill="clear"
+                (click)="restaurarImagen()"
+              >
+                <ion-icon
+                  name="refresh-outline"
+                  slot="start"
+                ></ion-icon>
+
+                Restaurar
+              </ion-button>
+            </div>
+
+            <div class="adjustments">
+              <h3>Ajustes</h3>
+
+              <label>
+                <span>
+                  Brillo: {{ brillo }}%
+                </span>
+
+                <ion-range
+                  min="50"
+                  max="160"
+                  step="1"
+                  [(ngModel)]="brillo"
+                ></ion-range>
+              </label>
+
+              <label>
+                <span>
+                  Contraste: {{ contraste }}%
+                </span>
+
+                <ion-range
+                  min="50"
+                  max="200"
+                  step="1"
+                  [(ngModel)]="contraste"
+                ></ion-range>
+              </label>
+
+              <label>
+                <span>
+                  Escala de grises:
+                  {{ escalaGrises }}%
+                </span>
+
+                <ion-range
+                  min="0"
+                  max="100"
+                  step="1"
+                  [(ngModel)]="escalaGrises"
+                ></ion-range>
+              </label>
+
+              <ion-button
+                expand="block"
+                [disabled]="procesandoEdicion"
+                (click)="guardarAjustes()"
+              >
+                @if (procesandoEdicion) {
+                  <ion-spinner
+                    name="crescent"
+                    slot="start"
+                  ></ion-spinner>
+
+                  Guardando...
+                } @else {
+                  Guardar ajustes
+                }
+              </ion-button>
+            </div>
+          }
+        </section>
+      }
+
+      <section class="export-section">
+        <div class="section-heading">
+          <span class="section-label">
+            Exportar
+          </span>
+
+          <h2>Guardar imágenes</h2>
+        </div>
+
+        <div class="export-settings">
+          <ion-item>
+            <ion-label position="stacked">
+              Formato
+            </ion-label>
+
+            <ion-select
+              [(ngModel)]="formatoSalida"
+              interface="popover"
+            >
+              <ion-select-option value="jpg">
+                JPG
+              </ion-select-option>
+
+              <ion-select-option value="png">
+                PNG
+              </ion-select-option>
+
+              <ion-select-option value="webp">
+                WebP
+              </ion-select-option>
+            </ion-select>
+          </ion-item>
+
+          <div class="quality-control">
+            <div>
+              <span>Calidad</span>
+
+              <strong>
+                {{ calidad }}%
+              </strong>
+            </div>
+
+            <ion-range
+              min="40"
+              max="100"
+              step="5"
+              [(ngModel)]="calidad"
+            ></ion-range>
+          </div>
+        </div>
+
+        <div class="export-actions">
+          <ion-button
+            expand="block"
+            [disabled]="
+              exportando ||
+              procesandoEdicion ||
+              modoRecorte
+            "
+            (click)="descargarImagenes()"
+          >
+            @if (exportando) {
+              <ion-spinner
+                name="crescent"
+                slot="start"
+              ></ion-spinner>
+
+              Exportando...
+            } @else {
+              <ion-icon
+                name="download-outline"
+                slot="start"
+              ></ion-icon>
+
+              Descargar
+            }
+          </ion-button>
+
+          <ion-button
+            expand="block"
+            fill="outline"
+            [disabled]="
+              exportando ||
+              procesandoEdicion ||
+              modoRecorte
+            "
+            (click)="compartirImagenes()"
+          >
+            <ion-icon
+              name="share-outline"
+              slot="start"
+            ></ion-icon>
+
+            Compartir
+          </ion-button>
+        </div>
+
+        <ion-button
+          expand="block"
+          fill="clear"
+          color="danger"
+          [disabled]="exportando"
+          (click)="eliminarTodas()"
+        >
+          <ion-icon
+            name="trash-outline"
+            slot="start"
+          ></ion-icon>
+
+          Eliminar todas
+        </ion-button>
+      </section>
+    }
+  </main>
 </ion-content>

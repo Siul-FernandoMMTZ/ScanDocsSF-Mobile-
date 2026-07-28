@@ -9,9 +9,11 @@
 </ion-header>
 
 <ion-content class="ion-padding">
+  <!-- Acciones principales de la cámara -->
   <section class="scanner-actions">
     <ion-button
       expand="block"
+      [disabled]="exportando || procesandoEdicion"
       (click)="tomarFoto()"
     >
       <ion-icon
@@ -26,6 +28,7 @@
       <ion-button
         expand="block"
         fill="outline"
+        [disabled]="exportando || procesandoEdicion"
         (click)="tomarFoto()"
       >
         <ion-icon
@@ -38,15 +41,22 @@
     }
   </section>
 
+  <!-- Estado vacío -->
   @if (paginas.length === 0) {
     <div class="empty-state">
       <ion-icon name="camera-outline"></ion-icon>
+
       <h2>No hay páginas</h2>
-      <p>Toma una fotografía para comenzar.</p>
+
+      <p>
+        Toma una fotografía para comenzar.
+      </p>
     </div>
   }
 
+  <!-- Contenido cuando existen páginas -->
   @if (paginas.length > 0) {
+    <!-- Miniaturas -->
     <section class="pages-grid">
       @for (
         pagina of paginas;
@@ -66,12 +76,19 @@
           />
 
           <div class="page-footer">
-            <span>Página {{ indice + 1 }}</span>
+            <span>
+              Página {{ indice + 1 }}
+            </span>
 
             <div class="page-actions">
+              <!-- Subir página -->
               <button
                 type="button"
-                [disabled]="indice === 0"
+                [disabled]="
+                  indice === 0 ||
+                  exportando ||
+                  procesandoEdicion
+                "
                 (click)="
                   $event.stopPropagation();
                   subirPagina(indice)
@@ -83,10 +100,13 @@
                 ></ion-icon>
               </button>
 
+              <!-- Bajar página -->
               <button
                 type="button"
                 [disabled]="
-                  indice === paginas.length - 1
+                  indice === paginas.length - 1 ||
+                  exportando ||
+                  procesandoEdicion
                 "
                 (click)="
                   $event.stopPropagation();
@@ -99,8 +119,13 @@
                 ></ion-icon>
               </button>
 
+              <!-- Duplicar página -->
               <button
                 type="button"
+                [disabled]="
+                  exportando ||
+                  procesandoEdicion
+                "
                 (click)="
                   $event.stopPropagation();
                   duplicarPagina(pagina.id)
@@ -112,9 +137,14 @@
                 ></ion-icon>
               </button>
 
+              <!-- Eliminar página -->
               <button
                 type="button"
                 class="delete-button"
+                [disabled]="
+                  exportando ||
+                  procesandoEdicion
+                "
                 (click)="
                   $event.stopPropagation();
                   eliminarFoto(pagina.id)
@@ -131,6 +161,7 @@
       }
     </section>
 
+    <!-- Editor de la página seleccionada -->
     @if (
       obtenerPaginaSeleccionada();
       as paginaSeleccionada
@@ -139,12 +170,14 @@
         <div class="editor-header">
           <div>
             <span>Editor</span>
+
             <h2>Editar página</h2>
           </div>
 
           <button
             type="button"
             class="close-editor"
+            [disabled]="procesandoEdicion || exportando"
             (click)="cerrarEditor()"
             aria-label="Cerrar editor"
           >
@@ -154,6 +187,7 @@
           </button>
         </div>
 
+        <!-- Vista previa -->
         <div class="editor-preview">
           @if (modoRecorte) {
             <img
@@ -176,11 +210,13 @@
           }
         </div>
 
+        <!-- Controles de recorte -->
         @if (modoRecorte) {
           <div class="crop-actions">
             <ion-button
               expand="block"
               fill="outline"
+              [disabled]="procesandoEdicion || exportando"
               (click)="girarRecorte()"
             >
               <ion-icon
@@ -193,7 +229,7 @@
 
             <ion-button
               expand="block"
-              [disabled]="procesandoEdicion"
+              [disabled]="procesandoEdicion || exportando"
               (click)="aplicarRecorteInteractivo()"
             >
               Aplicar recorte
@@ -203,16 +239,18 @@
               expand="block"
               fill="outline"
               color="medium"
+              [disabled]="procesandoEdicion || exportando"
               (click)="cancelarRecorte()"
             >
               Cancelar
             </ion-button>
           </div>
         } @else {
+          <!-- Activar recorte -->
           <ion-button
             expand="block"
             fill="outline"
-            [disabled]="procesandoEdicion"
+            [disabled]="procesandoEdicion || exportando"
             (click)="activarRecorte()"
           >
             <ion-icon
@@ -223,10 +261,11 @@
             Recortar
           </ion-button>
 
+          <!-- Acciones rápidas -->
           <div class="quick-actions">
             <ion-button
               fill="outline"
-              [disabled]="procesandoEdicion"
+              [disabled]="procesandoEdicion || exportando"
               (click)="girarPagina()"
             >
               <ion-icon
@@ -239,7 +278,7 @@
 
             <ion-button
               fill="outline"
-              [disabled]="procesandoEdicion"
+              [disabled]="procesandoEdicion || exportando"
               (click)="aplicarFiltro('documento')"
             >
               Documento
@@ -247,7 +286,7 @@
 
             <ion-button
               fill="outline"
-              [disabled]="procesandoEdicion"
+              [disabled]="procesandoEdicion || exportando"
               (click)="aplicarFiltro('grises')"
             >
               Grises
@@ -255,17 +294,15 @@
 
             <ion-button
               fill="outline"
-              [disabled]="procesandoEdicion"
-              (click)="
-                aplicarFiltro('blanco-negro')
-              "
+              [disabled]="procesandoEdicion || exportando"
+              (click)="aplicarFiltro('blanco-negro')"
             >
               B/N
             </ion-button>
 
             <ion-button
               fill="outline"
-              [disabled]="procesandoEdicion"
+              [disabled]="procesandoEdicion || exportando"
               (click)="aplicarFiltro('claro')"
             >
               Claro
@@ -273,7 +310,7 @@
 
             <ion-button
               fill="outline"
-              [disabled]="procesandoEdicion"
+              [disabled]="procesandoEdicion || exportando"
               (click)="aplicarFiltro('oscuro')"
             >
               Oscuro
@@ -281,7 +318,7 @@
 
             <ion-button
               fill="clear"
-              [disabled]="procesandoEdicion"
+              [disabled]="procesandoEdicion || exportando"
               (click)="restaurarPagina()"
             >
               <ion-icon
@@ -293,6 +330,7 @@
             </ion-button>
           </div>
 
+          <!-- Ajustes manuales -->
           <div class="editor-panel">
             <h3>Ajustes</h3>
 
@@ -305,6 +343,7 @@
                 min="50"
                 max="160"
                 step="1"
+                [disabled]="procesandoEdicion || exportando"
                 [(ngModel)]="brillo"
               ></ion-range>
             </label>
@@ -318,6 +357,7 @@
                 min="50"
                 max="200"
                 step="1"
+                [disabled]="procesandoEdicion || exportando"
                 [(ngModel)]="contraste"
               ></ion-range>
             </label>
@@ -332,76 +372,123 @@
                 min="0"
                 max="100"
                 step="1"
+                [disabled]="procesandoEdicion || exportando"
                 [(ngModel)]="escalaGrises"
               ></ion-range>
             </label>
 
             <ion-button
               expand="block"
-              [disabled]="procesandoEdicion"
+              [disabled]="procesandoEdicion || exportando"
               (click)="guardarAjustes()"
             >
-              Guardar ajustes
+              @if (procesandoEdicion) {
+                <ion-spinner
+                  name="crescent"
+                  slot="start"
+                ></ion-spinner>
+
+                Guardando...
+              } @else {
+                Guardar ajustes
+              }
             </ion-button>
           </div>
         }
       </section>
     }
 
-   <section class="export-section">
-  <h2>Exportar escaneo</h2>
+    <!-- Exportación -->
+    <section class="export-section">
+      <h2>Exportar escaneo</h2>
 
-  <ion-item>
-    <ion-label position="stacked">
-      Formato
-    </ion-label>
+      <ion-item>
+        <ion-label position="stacked">
+          Formato
+        </ion-label>
 
-    <ion-select
-      [(ngModel)]="formatoExportacion"
-      interface="popover"
-    >
-      <ion-select-option value="pdf">
-        PDF
-      </ion-select-option>
+        <ion-select
+          [(ngModel)]="formatoExportacion"
+          interface="popover"
+          [disabled]="exportando || procesandoEdicion"
+        >
+          <ion-select-option value="pdf">
+            PDF
+          </ion-select-option>
 
-      <ion-select-option value="jpg">
-        JPG
-      </ion-select-option>
+          <ion-select-option value="jpg">
+            JPG
+          </ion-select-option>
 
-      <ion-select-option value="png">
-        PNG
-      </ion-select-option>
-    </ion-select>
-  </ion-item>
+          <ion-select-option value="png">
+            PNG
+          </ion-select-option>
+        </ion-select>
+      </ion-item>
 
-  <div class="export-actions">
-    <ion-button
-      expand="block"
-      [disabled]="paginas.length === 0 || exportando"
-      (click)="descargarEscaneo()"
-    >
-      <ion-icon
-        name="download-outline"
-        slot="start"
-      ></ion-icon>
+      <div class="export-actions">
+        <!-- Descargar -->
+        <ion-button
+          expand="block"
+          [disabled]="
+            paginas.length === 0 ||
+            exportando ||
+            procesandoEdicion ||
+            modoRecorte
+          "
+          (click)="descargarEscaneo()"
+        >
+          @if (exportando) {
+            <ion-spinner
+              name="crescent"
+              slot="start"
+            ></ion-spinner>
 
-      Descargar
-    </ion-button>
+            Exportando...
+          } @else {
+            <ion-icon
+              name="download-outline"
+              slot="start"
+            ></ion-icon>
 
-    <ion-button
-      expand="block"
-      fill="outline"
-      [disabled]="paginas.length === 0 || exportando"
-      (click)="compartirEscaneo()"
-    >
-      <ion-icon
-        name="share-outline"
-        slot="start"
-      ></ion-icon>
+            Descargar
+          }
+        </ion-button>
 
-      Compartir
-    </ion-button>
-  </div>
-</section>
+        <!-- Compartir -->
+        <ion-button
+          expand="block"
+          fill="outline"
+          [disabled]="
+            paginas.length === 0 ||
+            exportando ||
+            procesandoEdicion ||
+            modoRecorte
+          "
+          (click)="compartirEscaneo()"
+        >
+          <ion-icon
+            name="share-outline"
+            slot="start"
+          ></ion-icon>
+
+          Compartir
+        </ion-button>
+      </div>
+
+      <!-- Mensaje correcto -->
+      @if (mensajeExportacion) {
+        <p class="export-success">
+          {{ mensajeExportacion }}
+        </p>
+      }
+
+      <!-- Mensaje de error -->
+      @if (errorExportacion) {
+        <p class="export-error">
+          {{ errorExportacion }}
+        </p>
+      }
+    </section>
   }
 </ion-content>

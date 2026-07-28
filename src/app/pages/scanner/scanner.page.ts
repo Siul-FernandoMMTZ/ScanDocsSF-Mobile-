@@ -137,7 +137,7 @@ export class ScannerPage
   formatoExportacion: FormatoExportacion = 'pdf';
   exportando = false;
   mensajeExportacion = '';
-
+  errorExportacion = '';
   private cropper?: Cropper;
   private cropperPendiente = false;
 
@@ -526,6 +526,153 @@ export class ScannerPage
     );
   }
 
+  private async exportarPaginasComoImagenes(
+  formato: 'jpg' | 'png',
+  compartir: boolean,
+): Promise<void> {
+  const archivosNativos: string[] = [];
+  const archivosWeb: File[] = [];
+
+  for (
+    let indice = 0;
+    indice < this.paginas.length;
+    indice++
+  ) {
+    const pagina =
+      this.paginas[indice];
+
+    const dataUrl =
+      await this.convertirFormatoImagen(
+        pagina.dataUrl,
+        formato,
+      );
+
+    const nombreArchivo =
+      `pagina_${indice + 1}.${formato}`;
+
+    const tipoMime =
+      formato === 'png'
+        ? 'image/png'
+        : 'image/jpeg';
+
+    if (Capacitor.isNativePlatform()) {
+      /*
+       * Compartir:
+       * guardar temporalmente en caché.
+       */
+      if (compartir) {
+        const resultado =
+          await Filesystem.writeFile({
+            path: nombreArchivo,
+            data: dataUrl.split(',')[1],
+            directory: Directory.Cache,
+            recursive: true,
+          });
+
+        archivosNativos.push(
+          resultado.uri,
+        );
+
+        continue;
+      }
+
+      /*
+       * Descargar:
+       * guardar directamente en Documents.
+       */
+      const resultado =
+        await Filesystem.writeFile({
+          path: nombreArchivo,
+          data: dataUrl.split(',')[1],
+          directory: Directory.Documents,
+          recursive: true,
+        });
+
+      console.log(
+        'Imagen guardada en:',
+        resultado.uri,
+      );
+
+      continue;
+    }
+
+    /*
+     * Navegador.
+     */
+    if (compartir) {
+      archivosWeb.push(
+        this.dataUrlAArchivo(
+          dataUrl,
+          nombreArchivo,
+          tipoMime,
+        ),
+      );
+    } else {
+      this.descargarDataUrl(
+        dataUrl,
+        nombreArchivo,
+      );
+    }
+  }
+
+  /*
+   * Solo Compartir abre Share.share().
+   */
+  if (
+    Capacitor.isNativePlatform() &&
+    compartir
+  ) {
+    await Share.share({
+      title:
+        `Compartir ${formato.toUpperCase()}`,
+
+      text:
+        'Imágenes creadas con ScanDocsSF.',
+
+      files: archivosNativos,
+
+      dialogTitle:
+        'Compartir imágenes',
+    });
+
+    this.mensajeExportacion =
+      'Imágenes preparadas para compartir.';
+
+    return;
+  }
+
+  /*
+   * Descarga nativa terminada.
+   */
+  if (
+    Capacitor.isNativePlatform() &&
+    !compartir
+  ) {
+    this.mensajeExportacion =
+      this.paginas.length === 1
+        ? 'Imagen guardada en los documentos de la aplicación.'
+        : `${this.paginas.length} imágenes guardadas en los documentos de la aplicación.`;
+
+    return;
+  }
+
+  /*
+   * Compartir en navegador.
+   */
+  if (compartir) {
+    await this.compartirArchivosWeb(
+      archivosWeb,
+    );
+
+    return;
+  }
+
+  this.mensajeExportacion =
+    this.paginas.length === 1
+      ? 'Imagen descargada correctamente.'
+      : `${this.paginas.length} imágenes descargadas.`;
+}
+
   private inicializarCropper(
     imagen: HTMLImageElement,
   ): void {
@@ -588,249 +735,220 @@ export class ScannerPage
   }
 
   async descargarEscaneo(): Promise<void> {
-    await this.exportarEscaneo(false);
+  console.log('CLICK DESCARGAR');
+
+  await this.exportarEscaneo(false);
+}
+
+
+async compartirEscaneo(): Promise<void> {
+  console.log('CLICK COMPARTIR');
+
+  await this.exportarEscaneo(true);
+}
+
+
+/**
+ * Controla la exportación en PDF, JPG o PNG.
+ *
+ * compartir = false:
+ * abre el selector nativo para guardar.
+ *
+ * compartir = true:
+ * abre el selector nativo para compartir.
+ */
+private async exportarEscaneo(
+  compartir: boolean,
+): Promise<void> {
+  if (
+    this.paginas.length === 0 ||
+    this.exportando
+  ) {
+    return;
   }
 
-  async compartirEscaneo(): Promise<void> {
-    await this.exportarEscaneo(true);
-  }
+  this.cancelarRecorte();
 
-  private async exportarEscaneo(
-    compartir: boolean,
-  ): Promise<void> {
+  this.exportando = true;
+  this.mensajeExportacion = '';
+  this.errorExportacion = '';
+
+  try {
     if (
-      this.paginas.length === 0 ||
-      this.exportando
+      this.formatoExportacion === 'pdf'
     ) {
+      const bytesPdf =
+        await this.crearPdfEscaneado();
+
+      const nombreArchivo =
+        `escaneo_${Date.now()}.pdf`;
+
+      await this.entregarArchivoPdf(
+        bytesPdf,
+        nombreArchivo,
+        compartir,
+      );
+
       return;
     }
 
-    this.cancelarRecorte();
-    this.exportando = true;
-    this.mensajeExportacion = '';
+    await this.exportarPaginasComoImagenes(
+      this.formatoExportacion,
+      compartir,
+    );
+  } catch (error) {
+    console.error(
+      'No se pudo exportar el escaneo:',
+      error,
+    );
 
-    try {
-      if (this.formatoExportacion === 'pdf') {
-        const bytesPdf =
-          await this.crearPdfEscaneado();
-
-        const nombreArchivo =
-          `escaneo_${Date.now()}.pdf`;
-
-        await this.entregarArchivoPdf(
-          bytesPdf,
-          nombreArchivo,
-          compartir,
-        );
-
-        return;
-      }
-
-      await this.exportarPaginasComoImagenes(
-        this.formatoExportacion,
-        compartir,
-      );
-    } catch (error) {
-      console.error(
-        'No se pudo exportar el escaneo:',
-        error,
-      );
-
-      this.mensajeExportacion =
-        'No se pudo exportar el documento.';
-    } finally {
-      this.exportando = false;
-    }
+    this.errorExportacion =
+      'No se pudo exportar el documento.';
+  } finally {
+    this.exportando = false;
   }
+}
 
-  private async crearPdfEscaneado():
-    Promise<Uint8Array> {
-    const documento =
-      await PDFDocument.create();
 
-    documento.setTitle('Documento escaneado');
-    documento.setCreator('ScanDocsSF');
-    documento.setProducer('ScanDocsSF');
+/**
+ * Convierte todas las páginas escaneadas
+ * en un único archivo PDF.
+ */
+private async crearPdfEscaneado():
+  Promise<Uint8Array> {
+  const documento =
+    await PDFDocument.create();
 
-    for (const pagina of this.paginas) {
-      const dataUrlJpeg =
-        await this.convertirFormatoImagen(
-          pagina.dataUrl,
-          'jpg',
-        );
+  documento.setTitle(
+    'Documento escaneado',
+  );
 
-      const imagen =
-        await documento.embedJpg(
-          dataUrlJpeg,
-        );
+  documento.setCreator(
+    'ScanDocsSF',
+  );
 
-      const paginaPdf =
-        documento.addPage([
-          imagen.width,
-          imagen.height,
-        ]);
+  documento.setProducer(
+    'ScanDocsSF',
+  );
 
-      paginaPdf.drawImage(imagen, {
-        x: 0,
-        y: 0,
-        width: imagen.width,
-        height: imagen.height,
-      });
-    }
+  for (const pagina of this.paginas) {
+    const dataUrlJpeg =
+      await this.convertirFormatoImagen(
+        pagina.dataUrl,
+        'jpg',
+      );
 
-    return documento.save({
-      useObjectStreams: true,
+    const imagen =
+      await documento.embedJpg(
+        dataUrlJpeg,
+      );
+
+    const paginaPdf =
+      documento.addPage([
+        imagen.width,
+        imagen.height,
+      ]);
+
+    paginaPdf.drawImage(imagen, {
+      x: 0,
+      y: 0,
+      width: imagen.width,
+      height: imagen.height,
     });
   }
 
-  private async entregarArchivoPdf(
-    bytesPdf: Uint8Array,
-    nombreArchivo: string,
-    compartir: boolean,
-  ): Promise<void> {
-    if (Capacitor.isNativePlatform()) {
-      const uri =
-        await this.guardarArchivoNativo(
-          nombreArchivo,
-          this.bytesABase64(bytesPdf),
-          compartir
-            ? Directory.Cache
-            : Directory.Documents,
-        );
+  return documento.save({
+    useObjectStreams: true,
+  });
+}
 
-      if (compartir) {
-        await Share.share({
-          title: 'Documento escaneado',
-          text: 'Documento creado con ScanDocsSF',
-          files: [uri],
-          dialogTitle: 'Compartir PDF',
+
+/**
+ * Entrega el PDF en navegador,
+ * Android o iOS.
+ */
+private async entregarArchivoPdf(
+  bytesPdf: Uint8Array,
+  nombreArchivo: string,
+  compartir: boolean,
+): Promise<void> {
+  const base64 =
+    this.bytesABase64(bytesPdf);
+
+  if (Capacitor.isNativePlatform()) {
+    /*
+     * COMPARTIR:
+     * crea el archivo en caché y abre
+     * el menú nativo de Android/iOS.
+     */
+    if (compartir) {
+      const resultado =
+        await Filesystem.writeFile({
+          path: nombreArchivo,
+          data: base64,
+          directory: Directory.Cache,
+          recursive: true,
         });
 
-        this.mensajeExportacion =
-          'PDF preparado para compartir.';
-      } else {
-        this.mensajeExportacion =
-          'PDF guardado en los documentos de la aplicación.';
-      }
+      await Share.share({
+        title: 'Compartir documento',
+        text: 'Documento creado con ScanDocsSF.',
+        files: [resultado.uri],
+        dialogTitle: 'Compartir PDF',
+      });
+
+      this.mensajeExportacion =
+        'PDF preparado para compartir.';
 
       return;
     }
 
-    if (compartir) {
-      await this.compartirArchivoEnNavegador(
-        bytesPdf,
-        nombreArchivo,
-        'application/pdf',
-      );
+    /*
+     * DESCARGAR:
+     * guarda directamente sin abrir
+     * el menú de compartir.
+     */
+    const resultado =
+      await Filesystem.writeFile({
+        path: nombreArchivo,
+        data: base64,
+        directory: Directory.Documents,
+        recursive: true,
+      });
 
-      return;
-    }
+    console.log(
+      'PDF guardado en:',
+      resultado.uri,
+    );
 
-    this.descargarBytesEnNavegador(
+    this.mensajeExportacion =
+      'PDF guardado correctamente en los documentos de la aplicación.';
+
+    return;
+  }
+
+  /*
+   * Navegador.
+   */
+  if (compartir) {
+    await this.compartirArchivoEnNavegador(
       bytesPdf,
       nombreArchivo,
       'application/pdf',
     );
 
-    this.mensajeExportacion =
-      'PDF descargado correctamente.';
+    return;
   }
 
-  private async exportarPaginasComoImagenes(
-    formato: 'jpg' | 'png',
-    compartir: boolean,
-  ): Promise<void> {
-    const archivosNativos: string[] = [];
-    const archivosWeb: File[] = [];
+  this.descargarBytesEnNavegador(
+    bytesPdf,
+    nombreArchivo,
+    'application/pdf',
+  );
 
-    for (
-      let indice = 0;
-      indice < this.paginas.length;
-      indice++
-    ) {
-      const pagina = this.paginas[indice];
-
-      const dataUrl =
-        await this.convertirFormatoImagen(
-          pagina.dataUrl,
-          formato,
-        );
-
-      const nombreArchivo =
-        `pagina_${indice + 1}.${formato}`;
-
-      const tipoMime =
-        formato === 'png'
-          ? 'image/png'
-          : 'image/jpeg';
-
-      if (Capacitor.isNativePlatform()) {
-        const uri =
-          await this.guardarArchivoNativo(
-            nombreArchivo,
-            dataUrl.split(',')[1],
-            compartir
-              ? Directory.Cache
-              : Directory.Documents,
-          );
-
-        archivosNativos.push(uri);
-        continue;
-      }
-
-      if (compartir) {
-        archivosWeb.push(
-          this.dataUrlAArchivo(
-            dataUrl,
-            nombreArchivo,
-            tipoMime,
-          ),
-        );
-      } else {
-        this.descargarDataUrl(
-          dataUrl,
-          nombreArchivo,
-        );
-      }
-    }
-
-    if (Capacitor.isNativePlatform()) {
-      if (compartir) {
-        await Share.share({
-          title:
-            `Escaneo en ${formato.toUpperCase()}`,
-          text:
-            'Imágenes creadas con ScanDocsSF',
-          files: archivosNativos,
-          dialogTitle:
-            'Compartir imágenes',
-        });
-
-        this.mensajeExportacion =
-          'Imágenes preparadas para compartir.';
-      } else {
-        this.mensajeExportacion =
-          this.paginas.length === 1
-            ? 'Imagen guardada correctamente.'
-            : `${this.paginas.length} imágenes guardadas.`;
-      }
-
-      return;
-    }
-
-    if (compartir) {
-      await this.compartirArchivosWeb(
-        archivosWeb,
-      );
-
-      return;
-    }
-
-    this.mensajeExportacion =
-      this.paginas.length === 1
-        ? 'Imagen descargada correctamente.'
-        : `${this.paginas.length} imágenes descargadas.`;
-  }
+  this.mensajeExportacion =
+    'PDF descargado correctamente.';
+}
 
   private convertirFormatoImagen(
     dataUrl: string,
@@ -1309,3 +1427,4 @@ export class ScannerPage
     this.escalaGrises = 0;
   }
 }
+

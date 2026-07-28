@@ -305,3 +305,22 @@ ion-toolbar {
     grid-template-columns: 1fr;
   }
 }
+.export-success,
+.export-error {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.export-success {
+  color: #d9d6ff;
+  background: rgba(123, 116, 200, 0.14);
+  border: 1px solid rgba(123, 116, 200, 0.4);
+}
+
+.export-error {
+  color: #ffd7dc;
+  background: rgba(255, 107, 120, 0.12);
+  border: 1px solid rgba(255, 107, 120, 0.45);
+}
